@@ -3,9 +3,9 @@ import { bitable, FieldType, IAttachmentField, IFieldMeta } from '@lark-base-ope
 import './App.css'
 
 /**
- * 处理图片：裁剪到指定比例并转换为 jpg 格式
+ * 处理图片：缩放到指定像素尺寸并居中裁剪，转换为 jpg 格式
  */
-const processImageWithRatio = (blob: Blob, ratioWidth: number, ratioHeight: number): Promise<Blob> => {
+const processImageWithPixel = (blob: Blob, targetWidth: number, targetHeight: number): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
@@ -19,36 +19,37 @@ const processImageWithRatio = (blob: Blob, ratioWidth: number, ratioHeight: numb
         return;
       }
 
+      // 设置 canvas 为目标像素尺寸
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+
       const imgWidth = img.width;
       const imgHeight = img.height;
-      const targetRatio = ratioWidth / ratioHeight;
+      const targetRatio = targetWidth / targetHeight;
       const currentRatio = imgWidth / imgHeight;
 
-      let drawWidth, drawHeight, offsetX, offsetY;
+      let sourceWidth, sourceHeight, sourceX, sourceY;
 
       if (currentRatio > targetRatio) {
-        // 图片太宽，裁剪左右
-        drawHeight = imgHeight;
-        drawWidth = imgHeight * targetRatio;
-        offsetX = (imgWidth - drawWidth) / 2;
-        offsetY = 0;
+        // 原图太宽，以高度为基准缩放，裁剪左右
+        sourceHeight = imgHeight;
+        sourceWidth = imgHeight * targetRatio;
+        sourceX = (imgWidth - sourceWidth) / 2;
+        sourceY = 0;
       } else {
-        // 图片太高，裁剪上下
-        drawWidth = imgWidth;
-        drawHeight = imgWidth / targetRatio;
-        offsetX = 0;
-        offsetY = (imgHeight - drawHeight) / 2;
+        // 原图太高，以宽度为基准缩放，裁剪上下
+        sourceWidth = imgWidth;
+        sourceHeight = imgWidth / targetRatio;
+        sourceX = 0;
+        sourceY = (imgHeight - sourceHeight) / 2;
       }
-
-      canvas.width = drawWidth;
-      canvas.height = drawHeight;
       
       // 填充白色背景
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
       
-      // 绘制裁剪后的图片
-      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight, 0, 0, drawWidth, drawHeight);
+      // 将原图裁剪并绘制到目标尺寸的 canvas 上
+      ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
       
       canvas.toBlob((result) => {
         if (result) {
@@ -82,8 +83,8 @@ function App() {
   // 选择状态
   const [selectedSourceFieldId, setSelectedSourceFieldId] = useState<string>('')
   const [selectedTargetFieldId, setSelectedTargetFieldId] = useState<string>('')
-  const [ratioWidth, setRatioWidth] = useState<number>(1)
-  const [ratioHeight, setRatioHeight] = useState<number>(1)
+  const [targetWidth, setTargetWidth] = useState<number>(800)
+  const [targetHeight, setTargetHeight] = useState<number>(800)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -194,14 +195,14 @@ function App() {
               let blob = await response.blob()
 
               // 处理图片比例
-              addLog(`正在调整比例: ${fileName}`, 'info')
-              blob = await processImageWithRatio(blob, ratioWidth, ratioHeight)
+              addLog(`正在调整像素: ${fileName}`, 'info')
+              blob = await processImageWithPixel(blob, targetWidth, targetHeight)
 
               // 构造新文件名
               const baseName = fileName.includes('.') 
                 ? fileName.substring(0, fileName.lastIndexOf('.'))
                 : fileName;
-              const newFileName = `${baseName}_${ratioWidth}x${ratioHeight}.jpg`
+              const newFileName = `${baseName}_${targetWidth}x${targetHeight}.jpg`
 
               processedFiles.push(new File([blob], newFileName, { type: 'image/jpeg' }))
               addLog(`已处理完成: ${newFileName}`, 'success')
@@ -245,7 +246,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>图片比例调整</h1>
+      <h1>图片尺寸调整</h1>
       
       <div className="card">
         <h3>📊 表格信息</h3>
@@ -254,8 +255,8 @@ function App() {
       </div>
 
       <div className="card">
-        <h3>🖼️ 调整图片比例</h3>
-        <p className="desc">自动遍历全表，调整附件字段中图片的宽高比</p>
+        <h3>🖼️ 调整图片像素</h3>
+        <p className="desc">自动遍历全表，将图片缩放并裁剪至指定像素尺寸</p>
         
         <div className="form-group">
           <label>� 源附件字段</label>
@@ -294,25 +295,24 @@ function App() {
         </div>
 
         <div className="form-group">
-          <label>📐 目标比例 (宽:高)</label>
+          <label>📐 目标像素 (宽 x 高)</label>
           <div className="ratio-inputs">
             <input 
               type="number" 
-              value={ratioWidth} 
-              onChange={(e) => setRatioWidth(Number(e.target.value) || 1)}
-              min="0.1"
-              step="0.1"
+              value={targetWidth} 
+              onChange={(e) => setTargetWidth(Number(e.target.value) || 1)}
               disabled={isConverting}
+              placeholder="宽"
             />
-            <span>:</span>
+            <span>x</span>
             <input 
               type="number" 
-              value={ratioHeight} 
-              onChange={(e) => setRatioHeight(Number(e.target.value) || 1)}
-              min="0.1"
-              step="0.1"
+              value={targetHeight} 
+              onChange={(e) => setTargetHeight(Number(e.target.value) || 1)}
               disabled={isConverting}
+              placeholder="高"
             />
+            <span style={{ fontSize: '0.8rem', color: '#8f959e', fontWeight: 'normal' }}>px</span>
           </div>
         </div>
 
