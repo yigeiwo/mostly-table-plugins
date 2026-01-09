@@ -131,16 +131,50 @@ function App() {
     }
 
     setIsConverting(true)
-    setStatusMsg('正在初始化处理...')
-    setLogs([]) // 清空旧日志
+    setStatusMsg('正在读取表格记录...')
+    setLogs([])
 
     try {
       const table = await bitable.base.getActiveTable()
       const recordIds = await table.getRecordIdList()
+      await processRecords(recordIds)
+    } catch (error: any) {
+      console.error(error)
+      setStatusMsg(`失败: ${error.message || '未知错误'}`)
+      setIsConverting(false)
+    }
+  }
+
+  const handleProcessSelected = async () => {
+    if (!selectedSourceFieldId || !selectedTargetFieldId) {
+      setStatusMsg('请先选择源字段和目标字段')
+      return
+    }
+
+    setIsConverting(true)
+    setStatusMsg('正在获取选中行...')
+    setLogs([])
+
+    try {
+      const selection = await bitable.base.getSelection()
+      if (!selection.recordId) {
+        throw new Error('请先在表格中点击选中一行记录')
+      }
+      await processRecords([selection.recordId])
+    } catch (error: any) {
+      console.error(error)
+      setStatusMsg(`失败: ${error.message || '未知错误'}`)
+      setIsConverting(false)
+    }
+  }
+
+  const processRecords = async (recordIds: string[]) => {
+    try {
+      const table = await bitable.base.getActiveTable()
       const total = recordIds.length
       
       if (total === 0) {
-        throw new Error('当前表格没有记录')
+        throw new Error('没有可处理的记录')
       }
 
       setProgress({ current: 0, total })
@@ -161,12 +195,12 @@ function App() {
           const attachmentList = await sourceField.getValue(recordId)
           
           if (!attachmentList || !Array.isArray(attachmentList) || attachmentList.length === 0) {
-            addLog(`第 ${i+1} 行: 未找到附件`, 'info')
+            addLog(`记录 ${i+1}: 未找到附件`, 'info')
             skipCount++
             continue
           }
 
-          addLog(`第 ${i+1} 行: 正在处理 ${attachmentList.length} 个附件...`, 'info')
+          addLog(`记录 ${i+1}: 正在处理 ${attachmentList.length} 个附件...`, 'info')
 
           const processedFiles: File[] = []
           
@@ -216,28 +250,27 @@ function App() {
             addLog(`正在上传 ${processedFiles.length} 个文件到目标字段...`, 'info')
             const res = await targetField.setValue(recordId, processedFiles)
             if (res) {
-              addLog(`第 ${i+1} 行: 处理成功`, 'success')
+              addLog(`记录 ${i+1}: 处理成功`, 'success')
               successCount++
             } else {
-              addLog(`第 ${i+1} 行: 设置失败 (SDK 返回 false)`, 'error')
+              addLog(`记录 ${i+1}: 设置失败 (SDK 返回 false)`, 'error')
               failCount++
             }
           } else {
-            addLog(`第 ${i+1} 行: 无有效图片可处理`, 'info')
+            addLog(`记录 ${i+1}: 无有效图片可处理`, 'info')
             skipCount++
           }
           
         } catch (recordError: any) {
           console.error(`Error processing record ${recordId}:`, recordError)
-          addLog(`第 ${i+1} 行: 失败 - ${recordError.message}`, 'error')
+          addLog(`记录 ${i+1}: 失败 - ${recordError.message}`, 'error')
           failCount++
         }
       }
 
       setStatusMsg(`处理完成！成功: ${successCount}, 跳过: ${skipCount}, 失败: ${failCount}`)
     } catch (error: any) {
-      console.error(error)
-      setStatusMsg(`失败: ${error.message || '未知错误'}`)
+      throw error
     } finally {
       setIsConverting(false)
       setProgress({ current: 0, total: 0 })
@@ -328,13 +361,22 @@ function App() {
           </div>
         )}
 
-        <button 
-          onClick={handleConvert} 
-          disabled={isConverting || !selectedSourceFieldId || !selectedTargetFieldId}
-          className={`convert-btn ${isConverting ? 'loading' : ''}`}
-        >
-          {isConverting ? '正在处理中...' : '开始调整比例'}
-        </button>
+        <div className="button-group">
+          <button 
+            onClick={handleConvert} 
+            disabled={isConverting || !selectedSourceFieldId || !selectedTargetFieldId}
+            className={`convert-btn ${isConverting ? 'loading' : ''}`}
+          >
+            {isConverting ? '正在处理中...' : '全部处理'}
+          </button>
+          <button 
+            onClick={handleProcessSelected} 
+            disabled={isConverting || !selectedSourceFieldId || !selectedTargetFieldId}
+            className={`convert-btn secondary ${isConverting ? 'loading' : ''}`}
+          >
+            {isConverting ? '正在处理中...' : '处理选中行'}
+          </button>
+        </div>
         {statusMsg && <p className={`status-msg ${statusMsg.includes('完成') || statusMsg.includes('成功') ? 'success' : 'error'}`}>{statusMsg}</p>}
 
         {logs.length > 0 && (

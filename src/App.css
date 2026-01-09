@@ -63,26 +63,55 @@ h3 {
   border-color: #3370ff;
 }
 
+.button-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
 .convert-btn {
-  width: 100%;
-  padding: 10px;
+  flex: 1;
   background-color: #3370ff;
   color: white;
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 16px;
   font-weight: 500;
-  transition: background-color 0.2s;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.convert-btn.secondary {
+  background-color: #f2f3f5;
+  color: #1f2329;
+  border: 1px solid #dee0e3;
 }
 
 .convert-btn:hover:not(:disabled) {
-  background-color: #285fd9;
+  background-color: #2859cc;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.convert-btn.secondary:hover:not(:disabled) {
+  background-color: #ebeced;
+  border-color: #bbbfc4;
+}
+
+.convert-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .convert-btn:disabled {
   background-color: #bbbfc4;
   cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.convert-btn.secondary:disabled {
+  background-color: #eff0f1;
+  color: #bbbfc4;
+  border-color: #dee0e3;
 }
 
 .convert-btn.loading {
